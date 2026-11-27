@@ -252,9 +252,11 @@ class SocketClient(
     final uri = lichessWSUri(route.path, queryParameters.isNotEmpty ? queryParameters : null);
 
     final Map<String, String> headers = authUser != null
-        ? {'Authorization': 'Bearer ${signBearerToken(authUser.token)}'}
+        ? {'Authorization': 'Bearer ${authBearer(authUser)}'}
         : {};
-    WebSocket.userAgent = makeUserAgent(packageInfo, deviceInfo, sri, authUser?.user);
+    WebSocket.userAgent = authUser?.isPersonalToken == true
+        ? personalTokenUserAgent(packageInfo.version)
+        : makeUserAgent(packageInfo, deviceInfo, sri, authUser?.user);
 
     _logger.info('Creating WebSocket connection to $route');
 

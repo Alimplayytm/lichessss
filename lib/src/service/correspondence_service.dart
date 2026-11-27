@@ -136,7 +136,7 @@ class CorrespondenceService(final Logger _log, {required final Ref ref}) {
 
     WebSocket.userAgent = ref.read(userAgentProvider);
     final Map<String, String> wsHeaders = _authUser != null
-        ? {'Authorization': 'Bearer ${signBearerToken(_authUser!.token)}'}
+        ? {'Authorization': 'Bearer ${authBearer(_authUser!)}'}
         : {};
 
     int movesPlayed = 0;

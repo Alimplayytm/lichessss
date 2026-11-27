@@ -299,13 +299,16 @@ Duration _defaultDelay(int retryCount) =>
     const Duration(milliseconds: 900) * math.pow(1.5, retryCount);
 
 final userAgentProvider = Provider<String>((Ref ref) {
-  final user = ref.watch(authControllerProvider.select((value) => value?.user));
+  final session = ref.watch(authControllerProvider);
+  if (session?.isPersonalToken == true) {
+    return personalTokenUserAgent(ref.read(preloadedDataProvider).requireValue.packageInfo.version);
+  }
 
   return makeUserAgent(
     ref.read(preloadedDataProvider).requireValue.packageInfo,
     ref.read(preloadedDataProvider).requireValue.deviceInfo,
     ref.read(preloadedDataProvider).requireValue.sri,
-    user,
+    session?.user,
   );
 });
 
@@ -517,17 +520,18 @@ class LichessClient(final Client _inner, final Ref _ref) implements Client {
   @override
   Future<StreamedResponse> send(BaseRequest request) async {
     final authUser = _ref.read(authControllerProvider);
+    if (authUser?.isPersonalToken == true &&
+        (request.url.scheme != 'https' || request.url.host != _lichessMainHost)) {
+      throw ClientException('Personal token requests require the configured HTTPS Lichess host.');
+    }
 
     if (authUser != null && !request.headers.containsKey('Authorization')) {
-      final bearer = signBearerToken(authUser.token);
+      final bearer = authBearer(authUser);
       request.headers['Authorization'] = 'Bearer $bearer';
     }
-    request.headers['User-Agent'] = makeUserAgent(
-      _cachedPackageInfo,
-      _cachedDeviceInfo,
-      _cachedSri,
-      authUser?.user,
-    );
+    request.headers['User-Agent'] = authUser?.isPersonalToken == true
+        ? personalTokenUserAgent(_cachedPackageInfo.version)
+        : makeUserAgent(_cachedPackageInfo, _cachedDeviceInfo, _cachedSri, authUser?.user);
 
     final quiet = request.headers.remove(kQuietRequestHeader) != null;
 

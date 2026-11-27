@@ -6,10 +6,12 @@ import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:lichess_mobile/src/constants.dart';
+import 'package:lichess_mobile/src/model/auth/auth_controller.dart' show authControllerProvider;
 import 'package:lichess_mobile/src/model/auth/auth_diagnostics.dart';
 import 'package:lichess_mobile/src/model/auth/auth_user.dart';
 import 'package:lichess_mobile/src/model/auth/bearer.dart';
 import 'package:lichess_mobile/src/model/auth/sign_in_failure_reporter.dart';
+import 'package:lichess_mobile/src/model/common/preloaded_data.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:logging/logging.dart';
@@ -60,6 +62,64 @@ final authRepositoryProvider = Provider<AuthRepository>((Ref ref) {
 class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
   final Logger _log = Logger('AuthRepository');
   LichessClient get _client => _ref.read(lichessClientProvider);
+
+  /// Personal tokens use the public account endpoint, with no official-client signature.
+  Future<AuthUser> signInWithPersonalToken(String input) async {
+    final token = input.trim();
+    if (!RegExp(r'^[A-Za-z0-9_]+$').hasMatch(token)) {
+      throw const AuthDiagnosticException(stage: .personalToken, reason: 'invalid_format');
+    }
+    logAuthEvent(.personalToken, 'start; signing=not-used; authorization=present');
+    final url = lichessUri('/api/account');
+    if (url.scheme != 'https') {
+      throw const AuthDiagnosticException(stage: .personalToken, reason: 'https_required');
+    }
+    // No shared-client/session header or automatic retry can affect this request.
+    final client = _ref.read(httpClientFactoryProvider)();
+    try {
+      final version = _ref.read(preloadedDataProvider).requireValue.packageInfo.version;
+      final response = await client
+          .get(
+            url,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'User-Agent': personalTokenUserAgent(version),
+              'Cache-Control': 'no-store',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
+      logAuthResponse(.personalToken, response);
+      if (response.statusCode != 200) {
+        throw AuthDiagnosticException(
+          stage: .personalToken,
+          reason: 'http_error',
+          statusCode: response.statusCode,
+          retryAfter: authRetryAfter(response.headers['retry-after'], now: DateTime.now()),
+        );
+      }
+      final json = jsonDecode(utf8.decode(response.bodyBytes));
+      if (json is! Map<String, dynamic>) {
+        throw const AuthDiagnosticException(
+          stage: .personalToken,
+          reason: 'invalid_account_response',
+        );
+      }
+      final user = User.fromServerJson(json);
+      logAuthEvent(.personalToken, 'account=decoded; next=session_storage');
+      return AuthUser(user: user.lightUser, token: token, isPersonalToken: true);
+    } on AuthDiagnosticException {
+      rethrow;
+    } on FormatException {
+      throw const AuthDiagnosticException(
+        stage: .personalToken,
+        reason: 'invalid_account_response',
+      );
+    } catch (_) {
+      throw const AuthDiagnosticException(stage: .personalToken, reason: 'request_or_decode_error');
+    } finally {
+      client.close();
+    }
+  }
 
   /// Sign in with Lichess using OAuth 2.0 PKCE using the system browser.
   Future<AuthUser> signIn() async {
@@ -275,11 +335,14 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
 
   /// Sign out the current user by revoking the auth token.
   Future<void> signOut() async {
+    // A personal token may also be used elsewhere. Forget it locally; its owner revokes it.
+    if (_ref.read(authControllerProvider)?.isPersonalToken == true) return;
     await _client.deleteRead(Uri(path: '/api/token'));
   }
 
   /// Revokes the token of [authUser], which need not be the active session.
   Future<void> revokeToken(AuthUser authUser) async {
+    if (authUser.isPersonalToken) return;
     // The default client is used on purpose: a 401 response from [lichessClientProvider] would be
     // taken for a 401 of the active session.
     final url = lichessUri('/api/token');
@@ -298,6 +361,15 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
 
   /// Check if the given authUser token is valid.
   Future<bool> checkToken(AuthUser authUser) async {
+    if (authUser.isPersonalToken) {
+      try {
+        await signInWithPersonalToken(authUser.token);
+        return true;
+      } on AuthDiagnosticException catch (error) {
+        if (error.statusCode == 401) return false;
+        rethrow;
+      }
+    }
     final defaultClient = _ref.read(defaultClientProvider);
     final data = await defaultClient
         .postReadJson(lichessUri('/api/token/test'), mapper: (json) => json, body: authUser.token)

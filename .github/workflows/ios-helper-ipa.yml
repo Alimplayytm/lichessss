@@ -32,6 +32,15 @@ jobs:
             lib/src/model/chess_helper/chess_helper.dart \
             lib/src/model/chess_helper/chess_helper_preferences.dart \
             lib/src/model/auth/auth_diagnostics.dart \
+            lib/src/model/auth/auth_user.dart \
+            lib/src/model/auth/bearer.dart \
+            lib/src/model/common/preloaded_data.dart \
+            lib/src/network/http.dart lib/src/network/socket.dart \
+            lib/src/service/correspondence_service.dart \
+            lib/src/view/auth/personal_token_screen.dart \
+            lib/src/view/auth/sign_in_options.dart \
+            test/model/auth/personal_token_test.dart \
+            test/view/auth/personal_token_screen_test.dart \
             lib/src/model/auth/auth_repository.dart \
             lib/src/model/auth/auth_controller.dart \
             lib/src/view/auth/sign_in_error.dart \
@@ -49,6 +58,15 @@ jobs:
           flutter analyze \
             lib/src/model/chess_helper \
             lib/src/model/auth/auth_diagnostics.dart \
+            lib/src/model/auth/auth_user.dart \
+            lib/src/model/auth/bearer.dart \
+            lib/src/model/common/preloaded_data.dart \
+            lib/src/network/http.dart lib/src/network/socket.dart \
+            lib/src/service/correspondence_service.dart \
+            lib/src/view/auth/personal_token_screen.dart \
+            lib/src/view/auth/sign_in_options.dart \
+            test/model/auth/personal_token_test.dart \
+            test/view/auth/personal_token_screen_test.dart \
             lib/src/model/auth/auth_repository.dart \
             lib/src/model/auth/auth_controller.dart \
             lib/src/view/auth/sign_in_error.dart \
@@ -63,6 +81,9 @@ jobs:
       - name: Test helper and engine
         run: |
           flutter test --dart-define=AUTH_DIAGNOSTICS=true \
+            test/model/auth/personal_token_test.dart test/view/auth/personal_token_screen_test.dart \
+            test/network/http_test.dart test/network/socket_test.dart \
+            test/service/correspondence_service_test.dart \
             test/model/auth/auth_diagnostics_test.dart test/model/auth/auth_repository_test.dart \
             test/model/auth/auth_controller_test.dart test/view/auth/email_login_screen_test.dart \
             test/model/chess_helper test/widgets/chess_helper_board_test.dart \
@@ -73,7 +94,7 @@ jobs:
       - name: Build unsigned iOS app
         run: |
           flutter build ios --release --no-codesign \
-            --build-number=3201 \
+            --build-number=3202 \
             --dart-define=AUTH_DIAGNOSTICS=true \
             --dart-define=LICHESS_HOST=lichess.org \
             --dart-define=LICHESS_WS_HOST=socket.lichess.org \
@@ -89,7 +110,7 @@ jobs:
           unzip -tq lichess-helper-unsigned.ipa
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: lichess-helper-auth-diagnostics-unsigned-ipa
+          name: lichess-helper-personal-token-unsigned-ipa
           path: build/ios/unsigned/lichess-helper-unsigned.ipa
           if-no-files-found: error
           retention-days: 14

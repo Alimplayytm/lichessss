@@ -11,6 +11,7 @@ final _logger = Logger('AuthDiagnostics');
 
 enum AuthStage() {
   browser,
+  personalToken,
   emailRequest,
   emailExchange,
   account,
@@ -112,6 +113,15 @@ class const AuthDiagnosticException({
   final Duration? retryAfter,
 }) implements Exception {
   String get userMessage {
+    if (stage == .personalToken && reason == 'invalid_format') {
+      return 'Paste only the personal API token, without a Bearer prefix or spaces.';
+    }
+    if (stage == .personalToken && statusCode == 401) {
+      return 'Personal token not accepted (401). Check that it is correct and has not been revoked.';
+    }
+    if (stage == .personalToken && statusCode == 403) {
+      return 'This token does not permit the requested API operation (403).';
+    }
     if (statusCode == 429) {
       return retryAfter == null
           ? 'Too many sign-in attempts (429). Wait before trying again; the server did not give a retry time.'

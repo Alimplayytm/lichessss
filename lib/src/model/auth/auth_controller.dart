@@ -73,6 +73,11 @@ class AuthController() extends Notifier<AuthUser?> {
     await _completeSignIn(authUser);
   }
 
+  Future<void> signInWithPersonalToken(String token) async {
+    final authUser = await ref.read(authRepositoryProvider).signInWithPersonalToken(token);
+    await _completeSignIn(authUser);
+  }
+
   /// Asks lichess to email a login code for the [username] account to [email].
   Future<void> requestEmailLoginCode({required String username, required String email}) {
     return ref.read(authRepositoryProvider).requestEmailLoginCode(username: username, email: email);

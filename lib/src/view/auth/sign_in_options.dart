@@ -3,6 +3,7 @@ import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/view/auth/email_login_screen.dart';
+import 'package:lichess_mobile/src/view/auth/personal_token_screen.dart';
 import 'package:lichess_mobile/src/widgets/adaptive_action_sheet.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -37,6 +38,12 @@ Future<void> showSignInOptions(BuildContext context, WidgetRef ref) {
           navigator.pushHidingTabBar(EmailLoginScreen.buildRoute());
         },
       ),
+      if (Theme.of(context).platform == TargetPlatform.iOS)
+        BottomSheetAction(
+          makeLabel: (_) => const Text('Sign in with API token'),
+          leading: const Icon(Icons.key),
+          onPressed: () => navigator.pushHidingTabBar(PersonalTokenScreen.buildRoute()),
+        ),
     ],
   );
 }
