@@ -52,17 +52,17 @@ void main() {
   ) async {
     final engine = HoldingHelperEngine();
     await openHelper(tester, engine: engine);
-    await tester.ensureVisible(find.text('Начать подсказки'));
-    await tester.tap(find.text('Начать подсказки'));
+    await tester.ensureVisible(find.text('Start hints'));
+    await tester.tap(find.text('Start hints'));
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
     expect(engine.commands.any((command) => command == 'go depth 12'), isTrue);
-    await tester.ensureVisible(find.text('Остановить анализ'));
-    await tester.tap(find.text('Остановить анализ'));
+    await tester.ensureVisible(find.text('Stop hints'));
+    await tester.tap(find.text('Stop hints'));
     await tester.pumpAndSettle();
     expect(engine.stopCount, 1);
-    expect(find.text('Лучший ход: —'), findsOneWidget);
-    expect(find.text('Начать подсказки'), findsOneWidget);
+    expect(find.text('Best move: —'), findsOneWidget);
+    expect(find.text('Start hints'), findsOneWidget);
     await tester.pump(const Duration(seconds: 16));
     expect(engine.stopCount, 1);
     expect(tester.takeException(), isNull);
@@ -73,8 +73,8 @@ void main() {
   ) async {
     final engine = HoldingHelperEngine();
     await openHelper(tester, engine: engine);
-    await tester.ensureVisible(find.text('Начать подсказки'));
-    await tester.tap(find.text('Начать подсказки'));
+    await tester.ensureVisible(find.text('Start hints'));
+    await tester.tap(find.text('Start hints'));
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
@@ -88,51 +88,51 @@ void main() {
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
     expect(engine.commands.where((command) => command == 'go depth 12').length, 2);
-    await tester.ensureVisible(find.text('Остановить анализ'));
-    await tester.tap(find.text('Остановить анализ'));
+    await tester.ensureVisible(find.text('Stop hints'));
+    await tester.tap(find.text('Stop hints'));
     await tester.pumpAndSettle();
   }, variant: const TargetPlatformVariant({TargetPlatform.iOS}));
 
   testWidgets('iOS menu has position and settings, without game review', (tester) async {
     await openHelper(tester);
-    expect(find.text('● Позиция'), findsOneWidget);
-    expect(find.text('Настройки'), findsOneWidget);
-    expect(find.text('Разбор партии'), findsNothing);
+    expect(find.text('● Position'), findsOneWidget);
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Game review'), findsNothing);
     expect(fakeEngine.startCount, 0);
-    await tester.tap(find.text('Настройки'));
+    await tester.tap(find.text('Settings'));
     await tester.pumpAndSettle();
-    expect(find.text('● Настройки'), findsOneWidget);
-    expect(find.text('Ограничить силу'), findsOneWidget);
+    expect(find.text('● Settings'), findsOneWidget);
+    expect(find.text('Limit strength'), findsOneWidget);
     expect(tester.takeException(), isNull);
   }, variant: const TargetPlatformVariant({TargetPlatform.iOS}));
 
   testWidgets('starts native hints and collapsing does not stop the helper', (tester) async {
     await openHelper(tester);
-    await tester.ensureVisible(find.text('Начать подсказки'));
-    await tester.tap(find.text('Начать подсказки'));
+    await tester.ensureVisible(find.text('Start hints'));
+    await tester.tap(find.text('Start hints'));
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pumpAndSettle();
     expect(fakeEngine.startCount, 1);
     expect(fakeEngine.commands.any((command) => command == 'go depth 12'), isTrue);
-    expect(find.text('Лучший ход: e4 (e2e4)'), findsOneWidget);
-    await tester.tap(find.byTooltip('Свернуть, не останавливая'));
+    expect(find.text('Best move: e4 (e2e4)'), findsOneWidget);
+    await tester.tap(find.byTooltip('Collapse without stopping'));
     await tester.pumpAndSettle();
     expect(find.text('♟ Chess Helper'), findsNothing);
     await tester.tap(find.byTooltip('Chess Helper'));
     await tester.pumpAndSettle();
-    expect(find.text('Остановить анализ'), findsOneWidget);
-    await tester.ensureVisible(find.text('Остановить анализ'));
-    await tester.tap(find.text('Остановить анализ'));
+    expect(find.text('Stop hints'), findsOneWidget);
+    await tester.ensureVisible(find.text('Stop hints'));
+    await tester.tap(find.text('Stop hints'));
     await tester.pumpAndSettle();
-    expect(find.text('Начать подсказки'), findsOneWidget);
+    expect(find.text('Start hints'), findsOneWidget);
   }, variant: const TargetPlatformVariant({TargetPlatform.iOS}));
 
   testWidgets('mini-board flip leaves the real board unchanged', (tester) async {
     await openHelper(tester);
     expect(tester.widget<Chessboard>(find.byType(Chessboard)).orientation, Side.white);
-    await tester.tap(find.byTooltip('Меню'));
+    await tester.tap(find.byTooltip('Menu'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Перевернуть мини-доску'));
+    await tester.tap(find.text('Flip mini-board'));
     await tester.pumpAndSettle();
     expect(tester.widget<StaticChessboard>(find.byType(StaticChessboard)).orientation, Side.black);
     expect(tester.widget<Chessboard>(find.byType(Chessboard)).orientation, Side.white);
@@ -142,7 +142,7 @@ void main() {
     testWidgets('panel fits $size without overflow', (tester) async {
       await openHelper(tester, size: size);
       expect(tester.takeException(), isNull);
-      await tester.tap(find.text('Настройки'));
+      await tester.tap(find.text('Settings'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
     }, variant: const TargetPlatformVariant({TargetPlatform.iOS}));

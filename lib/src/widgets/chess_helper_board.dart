@@ -169,7 +169,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
       _lines.clear();
       _history.clear();
       _historyRoot = null;
-      _error = 'Поддерживаются только корректные позиции стандартных шахмат.';
+      _error = 'Only valid standard chess positions are supported.';
     }
   }
 
@@ -223,7 +223,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
       _engineSubscription ??= ref.listenManual(engineProvider(spec), (_, next) {
         if (next case AsyncError(:final error)) {
           _cancelSearch();
-          if (mounted) setState(() => _error = 'Ошибка движка: $error');
+          if (mounted) setState(() => _error = 'Engine error: $error');
         }
       });
       if (ref.read(engineProvider(spec)) is AsyncError<Engine>) {
@@ -275,7 +275,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
         if (_suggestion == null && best != null) {
           _suggestion = (move: best, weakness: null, loss: null);
         }
-        if (_suggestion == null) _error = 'Расчёт прерван. Нажмите «Повторить».';
+        if (_suggestion == null) _error = 'Search interrupted. Tap Retry.';
       });
       if (best == null) {
         // An evaluator may have taken the shared slot while this search was running.
@@ -291,7 +291,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
         _searching = false;
         _suggestion = null;
         _lines.clear();
-        _error = 'Не удалось запустить движок: $error';
+        _error = 'Could not run the engine: $error';
       });
     }
   }
@@ -337,7 +337,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                 ),
           );
     } on Exception catch (error) {
-      if (mounted) setState(() => _error = 'Ошибка сохранения: $error');
+      if (mounted) setState(() => _error = 'Could not save settings: $error');
     }
   }
 
@@ -398,7 +398,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                             const SizedBox(width: 12),
                             const Expanded(child: Text('♟ Chess Helper')),
                             IconButton(
-                              tooltip: _pinned ? 'Открепить' : 'Закрепить',
+                              tooltip: _pinned ? 'Unpin' : 'Pin',
                               onPressed: () {
                                 setState(() => _pinned = !_pinned);
                                 unawaited(_saveLayout());
@@ -407,17 +407,17 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                             ),
                             ContextMenuIconButton(
                               icon: const Icon(Icons.more_horiz),
-                              semanticsLabel: 'Меню',
+                              semanticsLabel: 'Menu',
                               actions: [
                                 ContextMenuAction(
-                                  label: 'Перевернуть мини-доску',
+                                  label: 'Flip mini-board',
                                   onPressed: () {
                                     setState(() => _flipped = !_flipped);
                                     unawaited(_saveLayout());
                                   },
                                 ),
                                 ContextMenuAction(
-                                  label: 'Скопировать FEN',
+                                  label: 'Copy FEN',
                                   onPressed: () => unawaited(
                                     Clipboard.setData(
                                       ClipboardData(text: _actual?.fen ?? widget.controller.fen),
@@ -425,7 +425,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                                   ),
                                 ),
                                 ContextMenuAction(
-                                  label: 'Сбросить размер окна',
+                                  label: 'Reset panel size',
                                   onPressed: () {
                                     setState(() {
                                       _width = 350;
@@ -438,7 +438,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                               ],
                             ),
                             IconButton(
-                              tooltip: 'Свернуть, не останавливая',
+                              tooltip: 'Collapse without stopping',
                               onPressed: () => setState(_portal.hide),
                               icon: const Icon(Icons.remove),
                             ),
@@ -450,7 +450,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                           Expanded(
                             child: TextButton(
                               onPressed: () => setState(() => _settingsTab = false),
-                              child: Text(_settingsTab ? 'Позиция' : '● Позиция'),
+                              child: Text(_settingsTab ? 'Position' : '● Position'),
                             ),
                           ),
                           Expanded(
@@ -461,7 +461,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                                   _settingsTab = true;
                                 });
                               },
-                              child: Text(_settingsTab ? '● Настройки' : 'Настройки'),
+                              child: Text(_settingsTab ? '● Settings' : 'Settings'),
                             ),
                           ),
                         ],
@@ -493,7 +493,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                                       _schedule();
                                     } on Exception catch (error) {
                                       if (mounted) {
-                                        setState(() => _error = 'Ошибка сохранения: $error');
+                                        setState(() => _error = 'Could not save settings: $error');
                                       }
                                     }
                                   },
@@ -502,8 +502,8 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                                   crossAxisAlignment: CrossAxisAlignment.stretch,
                                   children: [
                                     const Text(
-                                      'Подсказки в онлайн-партиях нарушают fair play '
-                                      'и могут привести к блокировке.',
+                                      'Engine assistance in online games violates fair play '
+                                      'and can result in account bans.',
                                       style: TextStyle(fontSize: 11, color: Colors.orangeAccent),
                                     ),
                                     const SizedBox(height: 8),
@@ -530,18 +530,18 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                                     const SizedBox(height: 8),
                                     Text(
                                       info == null
-                                          ? 'Лучший ход: —'
-                                          : 'Лучший ход: ${_san(info.pv.first)} (${info.pv.first})',
+                                          ? 'Best move: —'
+                                          : 'Best move: ${_san(info.pv.first)} (${info.pv.first})',
                                       style: const TextStyle(fontSize: 18),
                                     ),
                                     if (_suggestion?.weakness case final weakness?)
                                       Text(
-                                        'Тренировочный ход: ${move == null ? '—' : _san(move)}'
-                                        ' · ${weakness == .blunder ? 'зевок' : 'ошибка'}'
-                                        '${_suggestion?.loss == null ? '' : ' · потеря ${_suggestion!.loss} cp'}',
+                                        'Training move: ${move == null ? '—' : _san(move)}'
+                                        ' · ${weakness == .blunder ? 'blunder' : 'mistake'}'
+                                        '${_suggestion?.loss == null ? '' : ' · loss ${_suggestion!.loss} cp'}',
                                       ),
                                     Text(
-                                      'Оценка за белых: ${info == null || _searched == null ? '—' : helperScore(info, _searched!.turn)}',
+                                      'Evaluation for White: ${info == null || _searched == null ? '—' : helperScore(info, _searched!.turn)}',
                                     ),
                                     LinearProgressIndicator(
                                       value: info?.cp == null || _searched == null
@@ -553,39 +553,35 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                                                           info!.cp! *
                                                           (_searched!.turn == .white ? 1 : -1),
                                                     )),
-                                      semanticsLabel: 'Условная оценка, не вероятность победы',
+                                      semanticsLabel:
+                                          'Approximate evaluation, not a win probability',
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      '${_engineName ?? 'Stockfish'} · глубина ${info?.depth ?? '—'}'
-                                      ' · ${info == null || info.elapsed.inMilliseconds == 0 ? '—' : (info.nodes * 1000 / info.elapsed.inMilliseconds).round()} узлов/с',
+                                      '${_engineName ?? 'Stockfish'} · depth ${info?.depth ?? '—'}'
+                                      ' · ${info == null || info.elapsed.inMilliseconds == 0 ? '—' : (info.nodes * 1000 / info.elapsed.inMilliseconds).round()} nodes/s',
                                     ),
                                     if (_searched != null && _searched!.fen != _actual?.fen)
                                       const Text(
-                                        'Предварительный вариант без ответа соперника.',
+                                        'Hypothetical preview without the opponent’s reply.',
                                         style: TextStyle(color: Colors.orangeAccent),
                                       ),
                                     if (_running && _searched == null && _error == null)
                                       const Text(
-                                        'Нет подсказки: выбран другой цвет, шах или партия завершена.',
+                                        'No hint: color filtered, opponent in check, or game over.',
                                       ),
-                                    if (_searching) const Text('Расчёт…'),
+                                    if (_searching) const Text('Searching…'),
                                     if (_error != null) Text(_error!),
                                     Text(
-                                      'Ошибки: $_usedMistakes/${ref.watch(chessHelperPreferencesProvider).plannedMistakes}'
-                                      ' · зевки: $_usedBlunders/${ref.watch(chessHelperPreferencesProvider).plannedBlunders}',
+                                      'Mistakes: $_usedMistakes/${ref.watch(chessHelperPreferencesProvider).plannedMistakes}'
+                                      ' · blunders: $_usedBlunders/${ref.watch(chessHelperPreferencesProvider).plannedBlunders}',
                                     ),
                                     FilledButton(
                                       onPressed: _toggleRunning,
-                                      child: Text(
-                                        _running ? 'Остановить анализ' : 'Начать подсказки',
-                                      ),
+                                      child: Text(_running ? 'Stop hints' : 'Start hints'),
                                     ),
                                     if (_running && !_searching)
-                                      TextButton(
-                                        onPressed: _schedule,
-                                        child: const Text('Повторить'),
-                                      ),
+                                      TextButton(onPressed: _schedule, child: const Text('Retry')),
                                   ],
                                 ),
                         ),
@@ -607,7 +603,7 @@ class _ChessHelperBoardState() extends ConsumerState<ChessHelperBoard> with Widg
                           onPanEnd: (_) => unawaited(_saveLayout()),
                           child: const Padding(
                             padding: EdgeInsets.all(8),
-                            child: Icon(Icons.drag_handle, semanticLabel: 'Изменить размер окна'),
+                            child: Icon(Icons.drag_handle, semanticLabel: 'Resize panel'),
                           ),
                         ),
                       ),
@@ -689,7 +685,7 @@ class const ChessHelperSettings({
       children: [
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Ограничить силу'),
+          title: const Text('Limit strength'),
           value: value.eloEnabled,
           onChanged: (enabled) => onChanged(value.copyWith(eloEnabled: enabled)),
         ),
@@ -701,7 +697,7 @@ class const ChessHelperSettings({
           divisions: 30,
           onChanged: value.eloEnabled ? (elo) => onChanged(value.copyWith(elo: elo.round())) : null,
         ),
-        Text('Глубина: ${value.depth}'),
+        Text('Depth: ${value.depth}'),
         Slider(
           value: value.depth.clamp(5, 20).toDouble(),
           min: 5,
@@ -709,39 +705,42 @@ class const ChessHelperSettings({
           divisions: 15,
           onChanged: (depth) => onChanged(value.copyWith(depth: depth.round())),
         ),
-        const Text('Режим подсказок'),
+        const Text('Hint mode'),
         DropdownButton<HelperHintMode>(
           isExpanded: true,
           value: value.hintMode,
           items: const [
-            DropdownMenuItem(value: HelperHintMode.playerPreview, child: Text('Как в v1: за меня')),
-            DropdownMenuItem(value: HelperHintMode.actualTurn, child: Text('По реальной очереди')),
+            DropdownMenuItem(
+              value: HelperHintMode.playerPreview,
+              child: Text('Player preview (v1)'),
+            ),
+            DropdownMenuItem(value: HelperHintMode.actualTurn, child: Text('Actual turn')),
           ],
           onChanged: (mode) {
             if (mode != null) onChanged(value.copyWith(hintMode: mode));
           },
         ),
-        const Text('Моя сторона'),
+        const Text('My side'),
         DropdownButton<HelperSide>(
           isExpanded: true,
           value: value.playerColor,
           items: const [
-            DropdownMenuItem(value: HelperSide.auto, child: Text('Авто')),
-            DropdownMenuItem(value: HelperSide.white, child: Text('Белые')),
-            DropdownMenuItem(value: HelperSide.black, child: Text('Чёрные')),
+            DropdownMenuItem(value: HelperSide.auto, child: Text('Auto')),
+            DropdownMenuItem(value: HelperSide.white, child: Text('White')),
+            DropdownMenuItem(value: HelperSide.black, child: Text('Black')),
           ],
           onChanged: (side) {
             if (side != null) onChanged(value.copyWith(playerColor: side));
           },
         ),
-        const Text('Для кого показывать подсказки'),
+        const Text('Show hints for'),
         DropdownButton<HelperSide>(
           isExpanded: true,
           value: value.hintSide,
           items: const [
-            DropdownMenuItem(value: HelperSide.both, child: Text('Обе стороны')),
-            DropdownMenuItem(value: HelperSide.white, child: Text('Белые')),
-            DropdownMenuItem(value: HelperSide.black, child: Text('Чёрные')),
+            DropdownMenuItem(value: HelperSide.both, child: Text('Both sides')),
+            DropdownMenuItem(value: HelperSide.white, child: Text('White')),
+            DropdownMenuItem(value: HelperSide.black, child: Text('Black')),
           ],
           onChanged: value.hintMode == .playerPreview
               ? null
@@ -749,14 +748,14 @@ class const ChessHelperSettings({
                   if (side != null) onChanged(value.copyWith(hintSide: side));
                 },
         ),
-        Text('Намеренные ошибки: ${value.plannedMistakes}'),
+        Text('Planned mistakes: ${value.plannedMistakes}'),
         Slider(
           value: value.plannedMistakes.clamp(0, 20).toDouble(),
           max: 20,
           divisions: 20,
           onChanged: (count) => onChanged(value.copyWith(plannedMistakes: count.round())),
         ),
-        Text('Намеренные зевки: ${value.plannedBlunders}'),
+        Text('Planned blunders: ${value.plannedBlunders}'),
         Slider(
           value: value.plannedBlunders.clamp(0, 20).toDouble(),
           max: 20,
@@ -764,12 +763,12 @@ class const ChessHelperSettings({
           onChanged: (count) => onChanged(value.copyWith(plannedBlunders: count.round())),
         ),
         const Text(
-          'Слабый ход выбирается из вариантов MultiPV. Ошибка или зевок нужной тяжести '
-          'не гарантируются. Лимит расходуется только после выполнения подсказанного хода.',
+          'Weaker moves are selected from MultiPV alternatives. Their severity is not guaranteed. '
+          'A quota is consumed only when the suggested move is played.',
           style: TextStyle(fontSize: 12),
         ),
         const SizedBox(height: 8),
-        FilledButton(onPressed: onSave, child: const Text('Сохранить настройки')),
+        FilledButton(onPressed: onSave, child: const Text('Save settings')),
       ],
     );
   }
