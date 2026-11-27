@@ -31,6 +31,12 @@ jobs:
           dart format --output=none --set-exit-if-changed \
             lib/src/model/chess_helper/chess_helper.dart \
             lib/src/model/chess_helper/chess_helper_preferences.dart \
+            lib/src/model/auth/auth_diagnostics.dart \
+            lib/src/model/auth/auth_repository.dart \
+            lib/src/model/auth/auth_controller.dart \
+            lib/src/view/auth/sign_in_error.dart \
+            lib/src/view/auth/email_login_screen.dart \
+            test/model/auth/auth_diagnostics_test.dart \
             lib/src/model/settings/preferences_storage.dart \
             lib/src/widgets/board.dart \
             lib/src/widgets/chess_helper_board.dart \
@@ -42,6 +48,12 @@ jobs:
         run: |
           flutter analyze \
             lib/src/model/chess_helper \
+            lib/src/model/auth/auth_diagnostics.dart \
+            lib/src/model/auth/auth_repository.dart \
+            lib/src/model/auth/auth_controller.dart \
+            lib/src/view/auth/sign_in_error.dart \
+            lib/src/view/auth/email_login_screen.dart \
+            test/model/auth/auth_diagnostics_test.dart \
             lib/src/model/settings/preferences_storage.dart \
             lib/src/widgets/board.dart \
             lib/src/widgets/chess_helper_board.dart \
@@ -50,7 +62,10 @@ jobs:
             test/model/chess_helper test/widgets/chess_helper_board_test.dart
       - name: Test helper and engine
         run: |
-          flutter test test/model/chess_helper test/widgets/chess_helper_board_test.dart \
+          flutter test --dart-define=AUTH_DIAGNOSTICS=true \
+            test/model/auth/auth_diagnostics_test.dart test/model/auth/auth_repository_test.dart \
+            test/model/auth/auth_controller_test.dart test/view/auth/email_login_screen_test.dart \
+            test/model/chess_helper test/widgets/chess_helper_board_test.dart \
             test/model/engine/engine_test.dart test/widgets/board_test.dart \
             test/model/model_layer_test.dart test/view/game/game_screen_test.dart \
             test/view/offline_computer/offline_computer_game_screen_test.dart \
@@ -58,6 +73,8 @@ jobs:
       - name: Build unsigned iOS app
         run: |
           flutter build ios --release --no-codesign \
+            --build-number=3201 \
+            --dart-define=AUTH_DIAGNOSTICS=true \
             --dart-define=LICHESS_HOST=lichess.org \
             --dart-define=LICHESS_WS_HOST=socket.lichess.org \
             --dart-define=LICHESS_WS_SECRET="${{ secrets.WS_SECRET }}"
@@ -72,7 +89,7 @@ jobs:
           unzip -tq lichess-helper-unsigned.ipa
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: lichess-helper-unsigned-ipa
+          name: lichess-helper-auth-diagnostics-unsigned-ipa
           path: build/ios/unsigned/lichess-helper-unsigned.ipa
           if-no-files-found: error
           retention-days: 14

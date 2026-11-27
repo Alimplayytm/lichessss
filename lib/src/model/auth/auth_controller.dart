@@ -4,6 +4,7 @@ import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/experimental/mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/account/account_repository.dart';
+import 'package:lichess_mobile/src/model/auth/auth_diagnostics.dart';
 import 'package:lichess_mobile/src/model/auth/auth_repository.dart';
 import 'package:lichess_mobile/src/model/auth/auth_storage.dart';
 import 'package:lichess_mobile/src/model/auth/auth_user.dart';
@@ -69,7 +70,7 @@ class AuthController() extends Notifier<AuthUser?> {
   /// Signs in the user with the OAuth browser flow.
   Future<void> signIn() async {
     final authUser = await ref.read(authRepositoryProvider).signIn();
-    await _onSignedIn(authUser);
+    await _completeSignIn(authUser);
   }
 
   /// Asks lichess to email a login code for the [username] account to [email].
@@ -86,7 +87,23 @@ class AuthController() extends Notifier<AuthUser?> {
     final authUser = await ref
         .read(authRepositoryProvider)
         .signInWithEmailCode(username: username, email: email, code: code);
-    await _onSignedIn(authUser);
+    await _completeSignIn(authUser);
+  }
+
+  Future<void> _completeSignIn(AuthUser authUser) async {
+    try {
+      await _onSignedIn(authUser);
+      logAuthEvent(.sessionStorage, 'session=activated');
+    } catch (_) {
+      if (authDiagnosticsEnabled) {
+        logAuthEvent(.sessionStorage, 'failed; reason=storage_or_session_error');
+        throw const AuthDiagnosticException(
+          stage: .sessionStorage,
+          reason: 'storage_or_session_error',
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<void> switchAccount(AuthUser account) async {

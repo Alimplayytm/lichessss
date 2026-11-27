@@ -1,7 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:lichess_mobile/src/constants.dart';
+import 'package:lichess_mobile/src/model/auth/auth_diagnostics.dart';
 import 'package:lichess_mobile/src/model/auth/auth_user.dart';
 import 'package:lichess_mobile/src/model/auth/bearer.dart';
 import 'package:lichess_mobile/src/model/auth/sign_in_failure_reporter.dart';
@@ -31,7 +36,7 @@ class const SignInCancelledException() implements Exception {
 }
 
 /// Thrown when the server rate-limits one of the email login requests (429).
-class const EmailLoginRateLimitException() implements Exception {
+class const EmailLoginRateLimitException({final Duration? retryAfter}) implements Exception {
   @override
   String toString() => 'Too many email login requests.';
 }
@@ -58,6 +63,11 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
 
   /// Sign in with Lichess using OAuth 2.0 PKCE using the system browser.
   Future<AuthUser> signIn() async {
+    logAuthEvent(
+      .browser,
+      'start; host=$kLichessHost; client=$kLichessClientId; '
+      'redirect=$kOAuthRedirectUri; signing=$authSecretConfiguration',
+    );
     final AuthorizationTokenResponse authResp;
     try {
       authResp = await _appAuth.authorizeAndExchangeCode(
@@ -73,8 +83,16 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
         ),
       );
     } on FlutterAppAuthUserCancelledException {
+      logAuthEvent(.browser, 'cancelled');
       throw const SignInCancelledException();
     } catch (e, st) {
+      if (authDiagnosticsEnabled) {
+        final reason = e is FlutterAppAuthPlatformException
+            ? safeAuthReason(e.platformErrorDetails.error)
+            : 'platform_or_network_error';
+        logAuthEvent(.browser, 'failed; reason=$reason');
+        throw AuthDiagnosticException(stage: .browser, reason: reason);
+      }
       await reportSignInFailure(_ref, e, st);
       rethrow;
     }
@@ -82,10 +100,30 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
     _log.fine('Got OAuth token response');
 
     final token = authResp.accessToken;
-    if (token == null) {
+    if (token == null || token.isEmpty) {
+      logAuthEvent(.browser, 'token=missing');
+      if (authDiagnosticsEnabled) {
+        throw const AuthDiagnosticException(stage: .browser, reason: 'missing_token');
+      }
       throw Exception('Access token not found.');
     }
 
+    final type = authResp.tokenType == null
+        ? 'not-reported'
+        : authResp.tokenType!.toLowerCase() == 'bearer'
+        ? 'bearer'
+        : 'other';
+    final scope = authResp.scopes == null
+        ? 'not-reported'
+        : authResp.scopes!.contains('web:mobile')
+        ? 'present'
+        : 'absent';
+    final expiry = authResp.accessTokenExpirationDateTime;
+    logAuthEvent(
+      .browser,
+      'token=received; tokenType=$type; mobileScope=$scope; '
+      'expired=${expiry == null ? 'unknown' : expiry.isBefore(DateTime.now())}; next=account',
+    );
     return await _fetchAuthUser(token);
   }
 
@@ -96,12 +134,17 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
     final url = lichessUri('/auth/mobile-code/email');
     // The default client is used on purpose: this endpoint is unauthenticated, and its 429 responses
     // are deliberate rate limiting that must not be retried like [lichessClientProvider] does.
-    final response = await _ref
-        .read(defaultClientProvider)
-        .post(url, body: {'email': email, 'username': username});
+    final response = await _postEmailLogin(.emailRequest, url, {
+      'email': email,
+      'username': username,
+    });
 
     if (response.statusCode == 429) {
-      throw const EmailLoginRateLimitException();
+      throw EmailLoginRateLimitException(
+        retryAfter: authDiagnosticsEnabled
+            ? authRetryAfter(response.headers['retry-after'], now: DateTime.now())
+            : null,
+      );
     }
     if (response.statusCode >= 400) {
       throw ServerException(
@@ -124,13 +167,19 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
     required String code,
   }) async {
     final url = lichessUri('/auth/mobile-code/bearer');
-    final response = await _ref
-        .read(defaultClientProvider)
-        .post(url, body: {'email': email, 'username': username, 'code': code});
+    final response = await _postEmailLogin(.emailExchange, url, {
+      'email': email,
+      'username': username,
+      'code': code,
+    });
 
     switch (response.statusCode) {
       case 429:
-        throw const EmailLoginRateLimitException();
+        throw EmailLoginRateLimitException(
+          retryAfter: authDiagnosticsEnabled
+              ? authRetryAfter(response.headers['retry-after'], now: DateTime.now())
+              : null,
+        );
       case 404:
         throw const InvalidEmailLoginCodeException();
     }
@@ -145,22 +194,83 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
 
     final token = response.body.trim();
     if (token.isEmpty) {
+      if (authDiagnosticsEnabled) {
+        throw const AuthDiagnosticException(stage: .emailExchange, reason: 'missing_token');
+      }
       throw Exception('Access token not found.');
     }
 
     _log.fine('Got a token from the email login code');
+    logAuthEvent(.emailExchange, 'token=received; next=account');
 
     return await _fetchAuthUser(token);
   }
 
   /// Fetches the account owning [token] and pairs it with the token.
   Future<AuthUser> _fetchAuthUser(String token) async {
+    if (authDiagnosticsEnabled) {
+      return await _fetchAuthUserWithDiagnostics(token);
+    }
     final user = await _client.readJson(
       Uri(path: '/api/account'),
       headers: {'Authorization': 'Bearer ${signBearerToken(token)}'},
       mapper: User.fromServerJson,
     );
     return AuthUser(token: token, user: user.lightUser);
+  }
+
+  Future<http.Response> _postEmailLogin(AuthStage stage, Uri url, Map<String, String> body) async {
+    logAuthEvent(stage, 'start; host=$kLichessHost');
+    try {
+      final pending = _ref.read(defaultClientProvider).post(url, body: body);
+      final response = await (authDiagnosticsEnabled
+          ? pending.timeout(const Duration(seconds: 30))
+          : pending);
+      logAuthResponse(stage, response);
+      return response;
+    } catch (error) {
+      if (!authDiagnosticsEnabled) rethrow;
+      final reason = error is TimeoutException ? 'network_timeout' : 'network_request_failed';
+      logAuthEvent(stage, 'failed; reason=$reason');
+      throw AuthDiagnosticException(stage: stage, reason: reason);
+    }
+  }
+
+  Future<AuthUser> _fetchAuthUserWithDiagnostics(String token) async {
+    logAuthEvent(.account, 'start; signing=$authSecretConfiguration; authorization=present');
+    try {
+      final response = await _client.get(
+        lichessUri('/api/account'),
+        headers: {'Authorization': 'Bearer ${signBearerToken(token)}'},
+      );
+      logAuthResponse(.account, response);
+      if (response.statusCode != 200) {
+        throw AuthDiagnosticException(
+          stage: .account,
+          reason: response.statusCode == 401 ? 'authorization_rejected' : 'http_error',
+          statusCode: response.statusCode,
+          retryAfter: authRetryAfter(response.headers['retry-after'], now: DateTime.now()),
+        );
+      }
+      final json = jsonDecode(utf8.decode(response.bodyBytes));
+      if (json is! Map<String, dynamic>) {
+        throw const AuthDiagnosticException(stage: .account, reason: 'invalid_account_response');
+      }
+      final user = User.fromServerJson(json);
+      logAuthEvent(.account, 'account=decoded; next=session_storage');
+      return AuthUser(token: token, user: user.lightUser);
+    } on AuthDiagnosticException {
+      rethrow;
+    } on FormatException {
+      logAuthEvent(.account, 'failed; reason=invalid_account_response');
+      throw const AuthDiagnosticException(stage: .account, reason: 'invalid_account_response');
+    } catch (_) {
+      logAuthEvent(.account, 'failed; reason=network_or_account_decode_error');
+      throw const AuthDiagnosticException(
+        stage: .account,
+        reason: 'network_or_account_decode_error',
+      );
+    }
   }
 
   /// Sign out the current user by revoking the auth token.

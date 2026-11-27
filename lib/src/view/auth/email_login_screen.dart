@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/experimental/mutation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
+import 'package:lichess_mobile/src/model/auth/auth_diagnostics.dart';
 import 'package:lichess_mobile/src/model/auth/auth_repository.dart';
 import 'package:lichess_mobile/src/model/user/user_repository.dart';
 import 'package:lichess_mobile/src/network/http.dart';
@@ -342,8 +343,12 @@ class _CodeFormState() extends ConsumerState<_CodeForm> {
 void showEmailLoginError(BuildContext context, MutationState<void> state) {
   if (state case MutationError(:final error)) {
     showSnackBar(context, switch (error) {
-      EmailLoginRateLimitException() => context.l10n.mobileTooManyLoginAttempts,
+      EmailLoginRateLimitException(:final retryAfter) =>
+        retryAfter == null
+            ? context.l10n.mobileTooManyLoginAttempts
+            : '${context.l10n.mobileTooManyLoginAttempts} Retry in ${retryAfter.inSeconds} seconds.',
       InvalidEmailLoginCodeException() => context.l10n.mobileInvalidOrExpiredLoginCode,
+      final AuthDiagnosticException failure => failure.userMessage,
       _ => context.l10n.mobileSomethingWentWrong,
     }, type: SnackBarType.error);
   }
