@@ -246,15 +246,20 @@ class SocketClient(
     final authUser = getSession();
 
     final queryParameters = Map<String, String>.of(route.queryParameters);
+    if (authUser?.usesPublicApi == true) {
+      // Public credentials cannot authenticate native gameplay sockets. Public site/watch
+      // connections stay anonymous; authenticated gameplay uses the Board API instead.
+      queryParameters['sri'] = sri;
+    }
     if (version != null) {
       queryParameters['v'] = version.toString();
     }
     final uri = lichessWSUri(route.path, queryParameters.isNotEmpty ? queryParameters : null);
 
-    final Map<String, String> headers = authUser != null
+    final Map<String, String> headers = authUser != null && !authUser.usesPublicApi
         ? {'Authorization': 'Bearer ${authBearer(authUser)}'}
         : {};
-    WebSocket.userAgent = authUser?.isPersonalToken == true
+    WebSocket.userAgent = authUser?.usesPublicApi == true
         ? personalTokenUserAgent(packageInfo.version)
         : makeUserAgent(packageInfo, deviceInfo, sri, authUser?.user);
 

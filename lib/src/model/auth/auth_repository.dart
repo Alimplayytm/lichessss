@@ -26,7 +26,8 @@ const _kOAuthCustomSchemeCallbackHost = 'login-callback';
 /// Custom schemes are more universally supported across Android browsers/OEMs than
 /// HTTPS App Link redirects, so they are used on every platform and host.
 const kOAuthRedirectUri = '$kLichessCustomUriSchemeName://$_kOAuthCustomSchemeCallbackHost';
-const oauthScopes = ['web:mobile'];
+const oauthScopes = ['board:play'];
+const kPublicOAuthClientId = 'github.com/Alimplayytm/lichessss';
 
 /// Thrown when the user dismisses the OAuth session before completing it.
 ///
@@ -64,15 +65,18 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
   LichessClient get _client => _ref.read(lichessClientProvider);
 
   /// Personal tokens use the public account endpoint, with no official-client signature.
-  Future<AuthUser> signInWithPersonalToken(String input) async {
+  Future<AuthUser> signInWithPersonalToken(String input) =>
+      _fetchPublicAuthUser(input, AuthStage.personalToken);
+
+  Future<AuthUser> _fetchPublicAuthUser(String input, AuthStage stage) async {
     final token = input.trim();
-    if (!RegExp(r'^[A-Za-z0-9_]+$').hasMatch(token)) {
-      throw const AuthDiagnosticException(stage: .personalToken, reason: 'invalid_format');
+    if (!RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(token)) {
+      throw AuthDiagnosticException(stage: stage, reason: 'invalid_format');
     }
-    logAuthEvent(.personalToken, 'start; signing=not-used; authorization=present');
+    logAuthEvent(stage, 'start; signing=not-used; authorization=present');
     final url = lichessUri('/api/account');
     if (url.scheme != 'https') {
-      throw const AuthDiagnosticException(stage: .personalToken, reason: 'https_required');
+      throw AuthDiagnosticException(stage: stage, reason: 'https_required');
     }
     // No shared-client/session header or automatic retry can affect this request.
     final client = _ref.read(httpClientFactoryProvider)();
@@ -88,10 +92,10 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
             },
           )
           .timeout(const Duration(seconds: 15));
-      logAuthResponse(.personalToken, response);
+      logAuthResponse(stage, response);
       if (response.statusCode != 200) {
         throw AuthDiagnosticException(
-          stage: .personalToken,
+          stage: stage,
           reason: 'http_error',
           statusCode: response.statusCode,
           retryAfter: authRetryAfter(response.headers['retry-after'], now: DateTime.now()),
@@ -99,23 +103,17 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
       }
       final json = jsonDecode(utf8.decode(response.bodyBytes));
       if (json is! Map<String, dynamic>) {
-        throw const AuthDiagnosticException(
-          stage: .personalToken,
-          reason: 'invalid_account_response',
-        );
+        throw AuthDiagnosticException(stage: stage, reason: 'invalid_account_response');
       }
       final user = User.fromServerJson(json);
-      logAuthEvent(.personalToken, 'account=decoded; next=session_storage');
+      logAuthEvent(stage, 'account=decoded; next=session_storage');
       return AuthUser(user: user.lightUser, token: token, isPersonalToken: true);
     } on AuthDiagnosticException {
       rethrow;
     } on FormatException {
-      throw const AuthDiagnosticException(
-        stage: .personalToken,
-        reason: 'invalid_account_response',
-      );
+      throw AuthDiagnosticException(stage: stage, reason: 'invalid_account_response');
     } catch (_) {
-      throw const AuthDiagnosticException(stage: .personalToken, reason: 'request_or_decode_error');
+      throw AuthDiagnosticException(stage: stage, reason: 'request_or_decode_error');
     } finally {
       client.close();
     }
@@ -125,14 +123,14 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
   Future<AuthUser> signIn() async {
     logAuthEvent(
       .browser,
-      'start; host=$kLichessHost; client=$kLichessClientId; '
-      'redirect=$kOAuthRedirectUri; signing=$authSecretConfiguration',
+      'start; host=$kLichessHost; client=$kPublicOAuthClientId; '
+      'redirect=$kOAuthRedirectUri; signing=not-used',
     );
     final AuthorizationTokenResponse authResp;
     try {
       authResp = await _appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
-          kLichessClientId,
+          kPublicOAuthClientId,
           kOAuthRedirectUri,
           allowInsecureConnections: kDebugMode,
           serviceConfiguration: AuthorizationServiceConfiguration(
@@ -175,16 +173,19 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
         : 'other';
     final scope = authResp.scopes == null
         ? 'not-reported'
-        : authResp.scopes!.contains('web:mobile')
+        : authResp.scopes!.contains('board:play')
         ? 'present'
         : 'absent';
     final expiry = authResp.accessTokenExpirationDateTime;
     logAuthEvent(
       .browser,
-      'token=received; tokenType=$type; mobileScope=$scope; '
+      'token=received; tokenType=$type; boardScope=$scope; '
       'expired=${expiry == null ? 'unknown' : expiry.isBefore(DateTime.now())}; next=account',
     );
-    return await _fetchAuthUser(token);
+    // The public OAuth flow uses a raw bearer token, just like an imported token.
+    // Keep the source distinct so logout can revoke app-issued credentials only.
+    final user = await _fetchPublicAuthUser(token, AuthStage.account);
+    return user.copyWith(isPersonalToken: false, isPublicOAuth: true);
   }
 
   /// Asks lichess to email a 6 character login code for the [username] account to [email].
@@ -348,7 +349,7 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
     final url = lichessUri('/api/token');
     final response = await _ref
         .read(defaultClientProvider)
-        .delete(url, headers: {'Authorization': 'Bearer ${signBearerToken(authUser.token)}'});
+        .delete(url, headers: {'Authorization': 'Bearer ${authBearer(authUser)}'});
     if (response.statusCode >= 400 && response.statusCode != 401) {
       throw ServerException(
         response.statusCode,
@@ -361,7 +362,7 @@ class AuthRepository(final Ref _ref, final FlutterAppAuth _appAuth) {
 
   /// Check if the given authUser token is valid.
   Future<bool> checkToken(AuthUser authUser) async {
-    if (authUser.isPersonalToken) {
+    if (authUser.usesPublicApi) {
       try {
         await signInWithPersonalToken(authUser.token);
         return true;

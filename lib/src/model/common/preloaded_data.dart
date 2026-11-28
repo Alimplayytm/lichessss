@@ -60,7 +60,7 @@ final preloadedDataProvider = FutureProvider<PreloadedData>((Ref ref) async {
   final token = authUser?.token;
   // Personal credentials are checked through the public account endpoint on use, not posted
   // as a token-test request body during startup.
-  if (token != null && authUser?.isPersonalToken != true) {
+  if (token != null && authUser?.usesPublicApi != true) {
     final userAgent = makeUserAgent(pInfo, deviceInfo, sri, null);
     final client = DefaultClient(ref.read(httpClientFactoryProvider)(), userAgent: userAgent);
     client

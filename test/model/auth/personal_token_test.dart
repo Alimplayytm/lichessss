@@ -10,6 +10,7 @@ import 'package:lichess_mobile/src/model/auth/auth_storage.dart';
 import 'package:lichess_mobile/src/model/auth/bearer.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/user/user.dart';
+import 'package:lichess_mobile/src/network/aggregator.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 
 import '../../network/fake_http_client_factory.dart';
@@ -26,6 +27,47 @@ const _personal = AuthUser(
 );
 
 void main() {
+  test('public OAuth credential mode survives storage without changing legacy sessions', () {
+    final user = _personal.copyWith(isPersonalToken: false, isPublicOAuth: true);
+    final restored = AuthUser.fromJson(
+      jsonDecode(jsonEncode(user.toJson())) as Map<String, dynamic>,
+    );
+    expect(restored.isPublicOAuth, isTrue);
+    expect(restored.isPersonalToken, isFalse);
+    expect(restored.usesPublicApi, isTrue);
+    expect(authBearer(restored), user.token);
+  });
+
+  test('public sessions never aggregate requests into private mobile endpoints', () async {
+    final paths = <String>[];
+    final container = await makeContainer(
+      authUser: _personal,
+      overrides: {
+        httpClientFactoryProvider: httpClientFactoryProvider.overrideWith(
+          (ref) => FakeHttpClientFactory(
+            () => MockClient((request) async {
+              paths.add(request.url.path);
+              return http.Response('{}', 200);
+            }),
+          ),
+        ),
+      },
+    );
+    final aggregator = container.read(aggregatorProvider);
+    await Future.wait([
+      for (final path in [
+        '/api/account',
+        '/api/account/playing',
+        '/api/challenge',
+        '/tournament/featured',
+        '/api/streamer/live',
+      ])
+        aggregator.readJson(Uri(path: path), atomicMapper: (json) => json),
+    ]);
+    expect(paths.length, 5);
+    expect(paths.any((path) => path.startsWith('/api/mobile/')), isFalse);
+  });
+
   test('personal token mode survives serialization; legacy sessions remain signed', () {
     final serialized = jsonDecode(jsonEncode(_personal.toJson())) as Map<String, dynamic>;
     expect(AuthUser.fromJson(serialized), _personal);

@@ -300,7 +300,7 @@ Duration _defaultDelay(int retryCount) =>
 
 final userAgentProvider = Provider<String>((Ref ref) {
   final session = ref.watch(authControllerProvider);
-  if (session?.isPersonalToken == true) {
+  if (session?.usesPublicApi == true) {
     return personalTokenUserAgent(ref.read(preloadedDataProvider).requireValue.packageInfo.version);
   }
 
@@ -520,7 +520,7 @@ class LichessClient(final Client _inner, final Ref _ref) implements Client {
   @override
   Future<StreamedResponse> send(BaseRequest request) async {
     final authUser = _ref.read(authControllerProvider);
-    if (authUser?.isPersonalToken == true &&
+    if (authUser?.usesPublicApi == true &&
         (request.url.scheme != 'https' || request.url.host != _lichessMainHost)) {
       throw ClientException('Personal token requests require the configured HTTPS Lichess host.');
     }
@@ -529,7 +529,7 @@ class LichessClient(final Client _inner, final Ref _ref) implements Client {
       final bearer = authBearer(authUser);
       request.headers['Authorization'] = 'Bearer $bearer';
     }
-    request.headers['User-Agent'] = authUser?.isPersonalToken == true
+    request.headers['User-Agent'] = authUser?.usesPublicApi == true
         ? personalTokenUserAgent(_cachedPackageInfo.version)
         : makeUserAgent(_cachedPackageInfo, _cachedDeviceInfo, _cachedSri, authUser?.user);
 

@@ -10,9 +10,13 @@ sealed class const AuthUser._() with _$AuthUser {
     required LightUser user,
     required String token,
     @Default(false) bool isPersonalToken,
+    @Default(false) bool isPublicOAuth,
   }) = _AuthUser;
 
   factory fromJson(Map<String, dynamic> json) => _$AuthUserFromJson(json);
+
+  /// Public credentials must never be signed or used with private mobile APIs.
+  bool get usesPublicApi => isPersonalToken || isPublicOAuth;
 
   @override
   String toString() =>

@@ -14,7 +14,7 @@ String signBearerToken(String token) {
 }
 
 /// Personal API credentials are sent as documented, without the official-client signature.
-String authBearer(AuthUser user) => user.isPersonalToken ? user.token : signBearerToken(user.token);
+String authBearer(AuthUser user) => user.usesPublicApi ? user.token : signBearerToken(user.token);
 
 String personalTokenUserAgent(String version) =>
     'Lichessss/$version (+https://github.com/Alimplayytm/lichessss; public API)';

@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/common/perf.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/styles/icon_extensions.dart';
 import 'package:lichess_mobile/src/styles/lichess_icons.dart';
 import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
+import 'package:lichess_mobile/src/view/board_api/board_api_screen.dart';
 import 'package:lichess_mobile/src/view/offline_computer/offline_computer_game_screen.dart';
 import 'package:lichess_mobile/src/view/over_the_board/over_the_board_screen.dart';
 import 'package:lichess_mobile/src/view/play/correspondence_challenges_screen.dart';
@@ -30,6 +32,16 @@ class const PlayMenu({
 
     return Column(
       children: [
+        if (ref.watch(authControllerProvider)?.usesPublicApi == true)
+          ListTile(
+            leading: const Icon(Icons.public),
+            title: const Text('Play online · Public API'),
+            subtitle: const Text('Rapid, Classical, Correspondence'),
+            onTap: () {
+              Navigator.of(context).popUntil((route) => route is! PopupRoute);
+              navigator.pushHidingTabBar(BoardApiScreen.buildRoute());
+            },
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
           child: CreateGameWidget(navigator: navigator),

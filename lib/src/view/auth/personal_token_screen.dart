@@ -80,7 +80,9 @@ class _PersonalTokenScreenState() extends ConsumerState<PersonalTokenScreen> {
                     onPressed: _busy
                         ? null
                         : () => launchUrl(
-                            Uri.https('lichess.org', '/account/oauth/token'),
+                            Uri.https('lichess.org', '/account/oauth/token/create', {
+                              'scopes[]': 'board:play',
+                            }),
                             mode: LaunchMode.externalApplication,
                           ),
                     child: const Text('Create or revoke a token on lichess.org'),
@@ -96,7 +98,7 @@ class _PersonalTokenScreenState() extends ConsumerState<PersonalTokenScreen> {
                     keyboardType: TextInputType.visiblePassword,
                     textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(labelText: 'Personal API token'),
-                    validator: (input) => RegExp(r'^[A-Za-z0-9_]+$').hasMatch(input?.trim() ?? '')
+                    validator: (input) => RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(input?.trim() ?? '')
                         ? null
                         : 'Paste only the token, without a Bearer prefix or spaces.',
                     onFieldSubmitted: (_) => _submit(),
@@ -109,8 +111,8 @@ class _PersonalTokenScreenState() extends ConsumerState<PersonalTokenScreen> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'This is public API access, not official-client authentication. Some mobile '
-                    'features or live games may not support it. Grant only the permissions you need. '
+                    'Online play uses the public Board API and requires the board:play permission. '
+                    'Use Play online · Public API for Rapid, Classical and Correspondence. '
                     'Engine assistance in games against people violates fair-play rules.',
                   ),
                   const SizedBox(height: 24),

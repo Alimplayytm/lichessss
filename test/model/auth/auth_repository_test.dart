@@ -76,7 +76,31 @@ void main() {
 
       expect(authUser.token, 'test-token');
       expect(authUser.user.name, 'test');
+      expect(authUser.isPublicOAuth, isTrue);
+      expect(authUser.usesPublicApi, isTrue);
     });
+
+    test(
+      'public OAuth requests board scope and validates account with an unsigned token',
+      () async {
+        final container = await appAuthContainer(
+          MockClient((request) {
+            expect(request.url.path, '/api/account');
+            expect(request.headers['Authorization'], 'Bearer test-token');
+            expect(request.headers['User-Agent'], startsWith('Lichessss/'));
+            return mockResponse(_accountResponse, 200);
+          }),
+          FakeFlutterAppAuth((request) async {
+            expect(request.clientId, kPublicOAuthClientId);
+            expect(request.scopes, ['board:play']);
+            return tokenResponse();
+          }),
+        );
+        final user = await container.read(authRepositoryProvider).signIn();
+        expect(user.isPersonalToken, isFalse);
+        expect(user.isPublicOAuth, isTrue);
+      },
+    );
 
     test('requests the custom-scheme redirect URI', () async {
       String? redirectUrl;

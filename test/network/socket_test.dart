@@ -9,7 +9,10 @@ import 'package:flutter_riverpod/misc.dart' show Override, ProviderOrFamily;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:lichess_mobile/src/model/auth/auth_user.dart';
+import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/common/socket.dart';
+import 'package:lichess_mobile/src/model/user/user.dart';
 import 'package:lichess_mobile/src/network/connectivity.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/network/socket.dart';
@@ -28,13 +31,14 @@ SocketClient makeTestSocketClient({
   WebSocketChannelFactory fakeChannelFactory = defaultFakeWebSocketChannelFactory,
   int? version,
   VoidCallback? onEventGapFailure,
+  AuthUser? authUser,
 }) {
   final client = SocketClient(
     defaultSocketUri,
     version: version,
     channelFactory: fakeChannelFactory,
     onEventGapFailure: onEventGapFailure,
-    getSession: () => null,
+    getSession: () => authUser,
     sri: 'testSri',
     packageInfo: PackageInfo(
       appName: 'lichess_mobile_test',
@@ -65,6 +69,25 @@ void main() {
   TestLichessBinding.ensureInitialized();
 
   group('SocketClient', () {
+    test('public sessions supply sri for anonymous site sockets', () async {
+      Uri? requestedUri;
+      final client = makeTestSocketClient(
+        authUser: const AuthUser(
+          user: LightUser(id: UserId('test'), name: 'Test'),
+          token: 'synthetic_public_token',
+          isPublicOAuth: true,
+        ),
+        fakeChannelFactory: FakeWebSocketChannelFactory((uri) {
+          requestedUri = uri;
+          return FakeWebSocketChannel(defaultSocketUri);
+        }),
+      );
+      addTearDown(client.close);
+      await client.connect();
+      expect(requestedUri?.queryParameters['sri'], 'testSri');
+      expect(WebSocket.userAgent, startsWith('Lichessss/'));
+    });
+
     test('handles ping/pong', () async {
       final fakeChannel = FakeWebSocketChannel(defaultSocketUri);
 

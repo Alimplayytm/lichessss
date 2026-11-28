@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:fast_immutable_collections/fast_immutable_collections.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/network/http.dart';
 import 'package:lichess_mobile/src/utils/cache.dart';
 import 'package:lichess_mobile/src/utils/json.dart';
@@ -35,7 +36,11 @@ typedef CachedAggregatorRequest = ({Uri targetGroupUri, Future<Map<String, dynam
 
 /// A provider for the [Aggregator] service.
 final aggregatorProvider = Provider<Aggregator>((ref) {
-  return Aggregator(ref.watch(lichessClientProvider));
+  final publicApi = ref.watch(authControllerProvider.select((user) => user?.usesPublicApi == true));
+  return Aggregator(
+    ref.watch(lichessClientProvider),
+    aggregationInterval: publicApi ? Duration.zero : kAggregationInterval,
+  );
 }, name: 'AggregatorProvider');
 
 /// Aggregator is used to group multiple requests to the same endpoint.

@@ -132,7 +132,7 @@ void main() {
           MockClient((request) async {
             requests++;
             expect(request.url.path, '/api/account');
-            expect(request.headers['Authorization'], 'Bearer ${signBearerToken('secret-token')}');
+            expect(request.headers['Authorization'], 'Bearer secret-token');
             return http.Response('{"error":"invalid_token","echo":"secret-token"}', 401);
           }),
           FakeFlutterAppAuth((_) async => tokenResponse(accessToken: 'secret-token')),

@@ -1,5 +1,6 @@
 import 'package:dartchess/dartchess.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lichess_mobile/src/model/auth/auth_controller.dart';
 import 'package:lichess_mobile/src/model/challenge/challenge.dart';
 import 'package:lichess_mobile/src/model/common/id.dart';
 import 'package:lichess_mobile/src/model/common/speed.dart';
@@ -16,6 +17,7 @@ import 'package:lichess_mobile/src/tab_navigation.dart';
 import 'package:lichess_mobile/src/utils/immersive_mode.dart';
 import 'package:lichess_mobile/src/utils/l10n_context.dart';
 import 'package:lichess_mobile/src/utils/navigation.dart';
+import 'package:lichess_mobile/src/view/board_api/board_api_screen.dart';
 import 'package:lichess_mobile/src/view/game/exported_game_title.dart';
 import 'package:lichess_mobile/src/view/game/game_body.dart';
 import 'package:lichess_mobile/src/view/game/game_common_widgets.dart';
@@ -91,6 +93,7 @@ class _GameScreenState() extends ConsumerState<GameScreen> {
 
   Future<void> _cancelSeek() async {
     if (!mounted) return;
+    if (ref.read(authControllerProvider)?.usesPublicApi == true) return;
     final loader = ref.read(gameScreenLoaderProvider(widget.source));
     // Only cancel if we are still seeking
     if (loader is! AsyncLoading<GameScreenState>) {
@@ -108,6 +111,12 @@ class _GameScreenState() extends ConsumerState<GameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(authControllerProvider)?.usesPublicApi == true && widget.lastMoveAt == null) {
+      return switch (widget.source) {
+        ExistingGameSource(:final id) => BoardApiGameScreen(gameId: id.gameId.value),
+        _ => const BoardApiScreen(),
+      };
+    }
     final boardPreferences = ref.watch(boardPreferencesProvider);
 
     switch (ref.watch(gameScreenLoaderProvider(widget.source))) {
