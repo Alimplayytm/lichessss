@@ -57,6 +57,8 @@ class _PersonalTokenScreenState() extends ConsumerState<PersonalTokenScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // A read alone does not keep this auto-disposed controller alive across the HTTP request.
+    ref.watch(authControllerProvider);
     return PopScope(
       canPop: !_busy,
       child: PlatformScaffold(
